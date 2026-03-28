@@ -7,11 +7,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rafa9-labs/codevault.git"
+    "url": "https://github.com/rafa9-labs/code-vault.git"
   },
-  "homepage": "https://github.com/rafa9-labs/codevault#readme",
+  "homepage": "https://github.com/rafa9-labs/code-vault#readme",
   "bugs": {
-    "url": "https://github.com/rafa9-labs/codevault/issues"
+    "url": "https://github.com/rafa9-labs/code-vault/issues"
   },
   "engines": {
     "vscode": "^1.85.0"
