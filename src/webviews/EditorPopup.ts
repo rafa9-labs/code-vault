@@ -78,6 +78,12 @@ export class EditorPopup {
 		}
 	}
 
+	/** Escape HTML special characters to prevent XSS in injected values */
+	private _esc(str: string): string {
+		const map: Record<string, string> = { '&': String.fromCharCode(38) + 'amp;', '<': String.fromCharCode(38) + 'lt;', '>': String.fromCharCode(38) + 'gt;', '"': String.fromCharCode(38) + 'quot;', "'": String.fromCharCode(38) + '#39;' };
+		return str.replace(/[&<>"']/g, (ch) => map[ch]);
+	}
+
 	private _getHtml(_extensionUri: vscode.Uri, item: CodeVaultItem | null): string {
 		const categories = CATEGORY_CONFIGS.map(c => ({ label: c.label, category: c.category, icon: c.icon.id }));
 		const languages = LANGUAGES;
@@ -250,7 +256,7 @@ body {
 
 <div class="field">
 	<label class="field-label">Name *</label>
-	<input class="field-input" type="text" id="f-name" placeholder="e.g., build-project" value="${isEdit ? item.name : ''}" />
+	<input class="field-input" type="text" id="f-name" placeholder="e.g., build-project" value="${isEdit ? this._esc(item.name) : ''}" />
 </div>
 
 <div class="field-row">
@@ -271,18 +277,18 @@ body {
 
 <div class="field">
 	<label class="field-label">Content *</label>
-	<textarea class="field-textarea code" id="f-content" placeholder="Enter your code, command, or text...">${isEdit ? item.content : ''}</textarea>
+	<textarea class="field-textarea code" id="f-content" placeholder="Enter your code, command, or text...">${isEdit ? this._esc(item.content) : ''}</textarea>
 	<div class="help-text">Tab inserts indent &middot; Ctrl+Enter saves</div>
 </div>
 
 <div class="field">
 	<label class="field-label">Description</label>
-	<input class="field-input" type="text" id="f-desc" placeholder="Optional description..." value="${isEdit ? (item.description || '') : ''}" />
+	<input class="field-input" type="text" id="f-desc" placeholder="Optional description..." value="${isEdit ? this._esc(item.description || '') : ''}" />
 </div>
 
 <div class="field">
 	<label class="field-label">Tags</label>
-	<input class="field-input" type="text" id="f-tags" placeholder="react, api, utility (comma-separated)" value="${isEdit ? (item.tags || []).join(', ') : ''}" />
+	<input class="field-input" type="text" id="f-tags" placeholder="react, api, utility (comma-separated)" value="${isEdit ? this._esc((item.tags || []).join(', ')) : ''}" />
 </div>
 
 <div class="actions">

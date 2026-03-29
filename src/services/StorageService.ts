@@ -65,14 +65,6 @@ export class StorageService {
 		return true;
 	}
 
-	deleteItems(ids: string[]): number {
-		const idSet = new Set(ids);
-		const items = this.getAllItems();
-		const filtered = items.filter(item => !idSet.has(item.id));
-		const deleted = items.length - filtered.length;
-		this._context.globalState.update(STORAGE_KEY, filtered);
-		return deleted;
-	}
 
 	// ── Usage Tracking ───────────────────────────────────────────
 

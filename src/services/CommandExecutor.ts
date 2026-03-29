@@ -51,14 +51,4 @@ export class CommandExecutor {
 		return terminal;
 	}
 
-	executeInActiveTerminal(command: string): void {
-		this.validateCommand(command);
-
-		const activeTerminal = vscode.window.activeTerminal;
-		if (activeTerminal) {
-			activeTerminal.sendText(command);
-		} else {
-			this.executeCommand(command);
-		}
-	}
 }

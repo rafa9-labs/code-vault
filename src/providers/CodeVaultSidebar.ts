@@ -1,10 +1,15 @@
 import * as vscode from 'vscode';
 import { CodeVaultItem, ItemCategory } from '../models/types';
-import { CATEGORY_CONFIGS, LANGUAGES, LANGUAGE_SHORT } from '../constants';
+import { CATEGORY_CONFIGS, LANGUAGE_SHORT } from '../constants';
 import { StorageService } from '../services/StorageService';
 import { CommandExecutor } from '../services/CommandExecutor';
 
-type EditorCallback = (action: string, data: any) => void;
+/** Discriminated union for sidebar editor actions */
+type EditorAction =
+	| { action: 'add'; data: null }
+	| { action: 'edit'; data: { id: string } };
+
+type EditorCallback = (msg: EditorAction) => void;
 
 /* ── SVG icons (monochrome, inherit color) ──────────────────── */
 const ICO = {
@@ -49,6 +54,12 @@ export class CodeVaultSidebar implements vscode.WebviewViewProvider {
 
 	public refresh(): void { this._sendAll(); }
 
+	/** Focus the sidebar and open the search bar via webview message */
+	public triggerSearch(): void {
+		this._view?.show(true);
+		this._view?.webview.postMessage({ command: 'openSearch' });
+	}
+
 	public resolveWebviewView(webviewView: vscode.WebviewView): void {
 		this._view = webviewView;
 		webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
@@ -57,8 +68,8 @@ export class CodeVaultSidebar implements vscode.WebviewViewProvider {
 		webviewView.webview.onDidReceiveMessage(async (msg) => {
 			switch (msg.command) {
 				case 'getItems': this._sendAll(); break;
-				case 'addItem': this._openEditor('add', null); break;
-				case 'editItem': this._openEditor('edit', { id: msg.data.id }); break;
+				case 'addItem': this._openEditor({ action: 'add', data: null }); break;
+				case 'editItem': this._openEditor({ action: 'edit', data: { id: msg.data.id } }); break;
 				case 'deleteItem': this._storage.deleteItem(msg.data.id); this._sendAll(); break;
 				case 'copyItem': {
 					const item = this._storage.getItemById(msg.data.id);
@@ -141,14 +152,15 @@ html,body{height:100%;background:var(--vscode-sideBar-background);color:var(--vs
 /* ── Card ───────────────────── */
 .card{background:var(--vscode-list-hoverBackground);border:1px solid var(--vscode-panelBorder,rgba(128,128,128,.15));border-radius:6px;padding:8px 10px;margin-bottom:4px;transition:all .15s}
 .card:hover{border-color:var(--vscode-buttonBackground,rgba(128,128,128,.4))}
-.card-name{font-weight:600;font-size:.9em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.card-name{font-weight:600;font-size:.9em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;display:flex;align-items:center;gap:4px}
 .card-content{font-family:var(--vscode-editor-font-family,'Consolas',monospace);font-size:.75em;color:var(--vscode-descriptionForeground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px;line-height:1.4}
-.card-actions{display:flex;gap:4px;align-items:center}
+.card-actions{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .ca{background:0 0;border:1px solid var(--vscode-panelBorder,rgba(128,128,128,.25));color:var(--vscode-editor-foreground);cursor:pointer;padding:3px 8px;border-radius:3px;font-size:.72em;font-family:inherit;display:inline-flex;align-items:center;gap:3px;transition:all .12s;opacity:.7}
 .ca:hover{opacity:1;background:var(--vscode-list-hoverBackground);border-color:var(--vscode-buttonBackground,rgba(128,128,128,.4))}
 .ca.x:hover{color:var(--vscode-errorForeground,#f14c4c);border-color:var(--vscode-errorForeground,#f14c4c)}
 .ca svg{flex-shrink:0}
 .card-meta{font-size:.65em;color:var(--vscode-descriptionForeground);margin-left:auto;opacity:.7;white-space:nowrap}
+.lang-badge{display:inline-flex;align-items:center;padding:1px 6px;background:var(--vscode-badge-background,rgba(128,128,128,.15));color:var(--vscode-badge-foreground,var(--vscode-descriptionForeground));border-radius:3px;font-size:.7em;font-weight:600;font-family:var(--vscode-editor-font-family,'Consolas',monospace);letter-spacing:.3px}
 
 /* ── Chips ──────────────────── */
 .chips{display:flex;flex-wrap:wrap;gap:3px;padding:2px 0}
@@ -162,8 +174,8 @@ html,body{height:100%;background:var(--vscode-sideBar-background);color:var(--vs
 .empty-t{font-size:.9em;line-height:1.5}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:5px 14px;border:none;border-radius:4px;font-size:.85em;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s}
 .btn:focus{outline:1px solid var(--vscode-focusBorder)}
-.bp{background:var(--vscode-buttonBackground);color:var(--vscode-buttonForeground)}.bp:hover{background:var(--vscode-buttonHoverBackground)}
-.bs{background:var(--vscode-buttonSecondaryBackground);color:var(--vscode-buttonSecondaryForeground)}.bs:hover{background:var(--vscode-buttonSecondaryHoverBackground)}
+.bp{background:var(--vscode-button-background);color:var(--vscode-button-foreground)}.bp:hover{background:var(--vscode-button-hoverBackground)}
+.bs{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground)}.bs:hover{background:var(--vscode-button-secondaryHoverBackground)}
 
 /* ── Footer ─────────────────── */
 .ftr{padding:4px 8px;border-top:1px solid var(--vscode-panelBorder,rgba(128,128,128,.2));display:flex;gap:4px;flex-shrink:0}
@@ -197,6 +209,7 @@ const ICO = ${ico};
 const catIco = ${catIco};
 const cats = ${JSON.stringify(cats)};
 const ls = ${JSON.stringify(ls)};
+const showLang = ${vscode.workspace.getConfiguration('codevault').get<boolean>('showLanguageBadge', true)};
 
 function timeAgo(ts) {
 	if (!ts) return '';
@@ -207,12 +220,17 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 
 function makeCard(i) {
 	const prev = esc(i.content.substring(0, 80));
+	let langHtml = '';
+	if (showLang && i.language && (i.category === 'snippet' || i.category === 'function')) {
+		const short = ls[i.language] || i.language;
+		langHtml = '<span class="lang-badge">' + esc(short) + '</span>';
+	}
 	let acts = '<button class="ca" onclick="event.stopPropagation();doCopy(\\''+i.id+'\\')">' + ICO.copy + 'Copy</button>';
 	if (i.category === 'command') acts += '<button class="ca" onclick="event.stopPropagation();doExec(\\''+i.id+'\\')">' + ICO.play + 'Run</button>';
 	acts += '<button class="ca" onclick="event.stopPropagation();doEdit(\\''+i.id+'\\')">' + ICO.edit + 'Edit</button>';
 	acts += '<button class="ca x" onclick="event.stopPropagation();doDel(\\''+i.id+'\\')">' + ICO.trash + '</button>';
 	acts += '<span class="card-meta">' + timeAgo(i.lastUsedAt||i.updatedAt) + ' &middot; ' + (i.useCount||0) + 'x</span>';
-	return '<div class="card"><div class="card-name">' + (catIco[i.category]||'') + ' ' + esc(i.name) + '</div><div class="card-content">' + prev + '</div><div class="card-actions">' + acts + '</div></div>';
+	return '<div class="card"><div class="card-name">' + (catIco[i.category]||'') + ' ' + esc(i.name) + ' ' + langHtml + '</div><div class="card-content">' + prev + '</div><div class="card-actions">' + acts + '</div></div>';
 }
 
 function render(items, mu, rc) {
@@ -267,7 +285,12 @@ document.getElementById('btn-add').onclick = doAdd;
 document.getElementById('btn-search').onclick = togSearch;
 document.getElementById('btn-exp').onclick = () => vscode.postMessage({command:'exportData'});
 document.getElementById('btn-imp').onclick = () => vscode.postMessage({command:'importData'});
-window.addEventListener('message', e => { const m = e.data; if(m.command==='itemsUpdated') render(m.data, m.mostUsed, m.recent); if(m.command==='searchResults') render(m.data, m.mostUsed, m.recent); });
+window.addEventListener('message', e => {
+	const m = e.data;
+	if(m.command==='itemsUpdated') render(m.data, m.mostUsed, m.recent);
+	if(m.command==='searchResults') render(m.data, m.mostUsed, m.recent);
+	if(m.command==='openSearch') { const b=document.getElementById('sb'),btn=document.getElementById('btn-search'); if(!b.classList.contains('on')){b.classList.add('on');btn.classList.add('on');} document.getElementById('si').focus(); }
+});
 vscode.postMessage({command:'getItems'});
 </script>
 </body>
